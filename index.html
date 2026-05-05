@@ -878,6 +878,52 @@ let currentFilename = '';
 let activeTab = 'chat';
 let ctxRow = -1;
 
+  // Add this helper function anywhere in your script
+async function fetchWithBackoff(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const response = await fetch(url, options);
+    
+    // If it's successful, return immediately
+    if (response.ok) return response;
+    
+    // If it's a 503 (High Demand) or 429 (Rate Limit)
+    if (response.status === 503 || response.status === 429) {
+      // Calculate wait time: 2s, 4s, 8s + random jitter to prevent clustering
+      const waitTime = (Math.pow(2, i) * 1000) + (Math.random() * 500);
+      setStatus(`Server busy. Retrying in ${Math.round(waitTime/1000)}s...`, 'warn');
+      
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      continue; // Loop around and try again
+    }
+    
+    // If it's a different error (like 400 Bad Request), don't retry, just throw
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `HTTP ${response.status}`);
+  }
+  throw new Error("Servers are too busy right now. Please try again in a few minutes.");
+}
+
+// Then, inside your sendChat() function, replace your fetch call with this:
+// ...
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    const requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: { text: systemPrompt } },
+        contents: [{ parts: [{ text: text }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+      })
+    };
+
+    // Use the new backoff function instead of standard fetch
+    const resp = await fetchWithBackoff(url, requestOptions, 4); // Will try up to 4 times
+    const result = await resp.json();
+    
+    // ... continue with extracting the text as normal
+
 /* ═══════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════ */
