@@ -903,26 +903,7 @@ async function fetchWithBackoff(url, options, maxRetries = 3) {
   throw new Error("Servers are too busy right now. Please try again in a few minutes.");
 }
 
-// Then, inside your sendChat() function, replace your fetch call with this:
-// ...
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    
-    const requestOptions = {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: { text: systemPrompt } },
-        contents: [{ parts: [{ text: text }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
-      })
-    };
 
-    // Use the new backoff function instead of standard fetch
-    const resp = await fetchWithBackoff(url, requestOptions, 4); // Will try up to 4 times
-    const result = await resp.json();
-    
-    // ... continue with extracting the text as normal
 
 /* ═══════════════════════════════════════════════
    INIT
@@ -1445,30 +1426,26 @@ async function sendChat() {
 
   const systemPrompt = buildSystemPrompt();
 
+ // Then, inside your sendChat() function, replace your fetch call with this:
+// ...
   try {
-    // Gemini 1.5 Flash Endpoint
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
-
-    const resp = await fetch(url, {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    const requestOptions = {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system_instruction: {
-          parts: { text: systemPrompt }
-        },
-        contents: [
-          {
-            parts: [{ text: text }]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.1, // Lower temperature for data accuracy
-          maxOutputTokens: 8192,
-        }
+        system_instruction: { parts: { text: systemPrompt } },
+        contents: [{ parts: [{ text: text }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
       })
-    });
+    };
+
+    // Use the new backoff function instead of standard fetch
+    const resp = await fetchWithBackoff(url, requestOptions, 4); // Will try up to 4 times
+    const result = await resp.json();
+    
+    // ... continue with extracting the text as normal
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
