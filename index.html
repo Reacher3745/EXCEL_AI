@@ -770,21 +770,21 @@ input[type=file]{display:none}
       </div>
     </div>
 
-<!-- API KEY SECTION -->
-<div class="api-section">
-  <div class="api-label">
-    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M7 7l3 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-    Google Gemini API Key
-  </div>
-  <div class="api-row">
-    <input class="api-inp" type="password" id="apiKeyInp" placeholder="AIzaSy..." oninput="handleApiKey(this.value)" autocomplete="off">
-    <button class="api-toggle" onclick="toggleApiVis()" id="apiVisBtn">Show</button>
-  </div>
-  <div class="api-status-row">
-    <div class="status-dot" id="apiDot"></div>
-    <span id="apiMsg" style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace"></span>
-  </div>
-</div>
+    <!-- API KEY SECTION -->
+    <div class="api-section">
+      <div class="api-label">
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M7 7l3 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Google Gemini API Key
+      </div>
+      <div class="api-row">
+        <input class="api-inp" type="password" id="apiKeyInp" placeholder="AIzaSy..." oninput="handleApiKey(this.value)" autocomplete="off">
+        <button class="api-toggle" onclick="toggleApiVis()" id="apiVisBtn">Show</button>
+      </div>
+      <div class="api-status-row">
+        <div class="status-dot" id="apiDot"></div>
+        <span id="apiMsg" style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace"></span>
+      </div>
+    </div>
 
     <!-- CHAT PANEL -->
     <div class="chat-panel" id="chatPanel">
@@ -878,33 +878,6 @@ let currentFilename = '';
 let activeTab = 'chat';
 let ctxRow = -1;
 
-  // Add this helper function anywhere in your script
-async function fetchWithBackoff(url, options, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
-    const response = await fetch(url, options);
-    
-    // If it's successful, return immediately
-    if (response.ok) return response;
-    
-    // If it's a 503 (High Demand) or 429 (Rate Limit)
-    if (response.status === 503 || response.status === 429) {
-      // Calculate wait time: 2s, 4s, 8s + random jitter to prevent clustering
-      const waitTime = (Math.pow(2, i) * 1000) + (Math.random() * 500);
-      setStatus(`Server busy. Retrying in ${Math.round(waitTime/1000)}s...`, 'warn');
-      
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-      continue; // Loop around and try again
-    }
-    
-    // If it's a different error (like 400 Bad Request), don't retry, just throw
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error?.message || `HTTP ${response.status}`);
-  }
-  throw new Error("Servers are too busy right now. Please try again in a few minutes.");
-}
-
-
-
 /* ═══════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════ */
@@ -931,7 +904,7 @@ function refreshApiStatus() {
     dot.className = 'status-dot'; msg.textContent = 'Enter your key to enable AI'; return;
   }
   if (apiKey.startsWith('AIza')) {
-    dot.className = 'status-dot ok'; msg.textContent = 'Key set · Gemini 1.5 Flash';
+    dot.className = 'status-dot ok'; msg.textContent = 'Key set · Gemini 2.5 Flash';
   } else {
     dot.className = 'status-dot err'; msg.textContent = 'Looks invalid — expected AIza…';
   }
@@ -968,14 +941,11 @@ function loadFile(f) {
   else {
     reader.onload = ev => {
       try {
-        // Ensure XLSX loaded correctly
         if (typeof XLSX === 'undefined') {
           throw new Error("Excel library failed to load. Check your internet connection.");
         }
 
         const dataArray = new Uint8Array(ev.target.result);
-        
-        // Check if file is empty or locked by the OS
         if (dataArray.length === 0) {
             throw new Error("File is empty or locked by another program. Close Excel and try again.");
         }
@@ -984,21 +954,15 @@ function loadFile(f) {
         const wsName = wb.SheetNames[0];
         const ws = wb.Sheets[wsName];
         
-        // Convert to 2D array (header: 1 forces this)
         const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         
         if (!arr || arr.length === 0) {
           throw new Error("No data found in the spreadsheet.");
         }
 
-        // Clean headers and data
         headers = arr[0].map(h => String(h || '').trim());
-        
         data = arr.slice(1).map(r => {
-          // Replaced '??' with safer null check for browser compatibility
           const row = r.map(cell => String(cell !== undefined && cell !== null ? cell : ''));
-          
-          // Ensure every row has the exact same number of columns as headers
           while (row.length < headers.length) row.push('');
           return row.slice(0, headers.length);
         });
@@ -1352,8 +1316,30 @@ function switchTab(tab) {
 }
 
 /* ═══════════════════════════════════════════════
-   CHAT
+   CHAT AND API LOGIC
 ═══════════════════════════════════════════════ */
+// Helper function to handle server overload gracefully
+async function fetchWithBackoff(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const response = await fetch(url, options);
+    
+    if (response.ok) return response;
+    
+    // Check for "Too Many Requests" or "High Demand"
+    if (response.status === 503 || response.status === 429) {
+      const waitTime = (Math.pow(2, i) * 1000) + (Math.random() * 500);
+      setStatus(`Server busy. Retrying in ${Math.round(waitTime/1000)}s...`, 'warn');
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      continue;
+    }
+    
+    // If it's a structural error (e.g., bad API key), throw immediately
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `HTTP ${response.status}`);
+  }
+  throw new Error("Servers are too busy right now. Please try again in a few minutes.");
+}
+
 function quickSend(text) {
   document.getElementById('chatTa').value = text;
   sendChat();
@@ -1426,8 +1412,6 @@ async function sendChat() {
 
   const systemPrompt = buildSystemPrompt();
 
- // Then, inside your sendChat() function, replace your fetch call with this:
-// ...
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     
@@ -1441,28 +1425,25 @@ async function sendChat() {
       })
     };
 
-    // Use the new backoff function instead of standard fetch
-    const resp = await fetchWithBackoff(url, requestOptions, 4); // Will try up to 4 times
+    // Use the backoff function to handle high demand automatically
+    const resp = await fetchWithBackoff(url, requestOptions, 4);
     const result = await resp.json();
     
-    // ... continue with extracting the text as normal
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${resp.status}`);
+    // Ensure the AI actually returned a text payload before trying to read it
+    if (!result.candidates || !result.candidates[0].content) {
+        throw new Error("Received an unexpected response format from Google's servers.");
     }
 
-    const result = await resp.json();
-    
-    // Extract text from Gemini's response structure
     const fullText = result.candidates[0].content.parts[0].text;
     hideThinking();
 
-    // The rest of your JSON extraction logic remains the same
+    // Look for the JSON block the AI was instructed to create
     const jsonMatch = fullText.match(/```json\s*([\s\S]*?)\s*```/);
-    let displayText = fullText.replace(/```json[\s\S]*?```/g, '').trim();
+    let displayText = fullText.replace(/```json[\s\S]*?
+```/g, '').trim();
     let badgeText = '';
 
+    // Apply the JSON modifications to the spreadsheet
     if (jsonMatch) {
       try {
         const op = JSON.parse(jsonMatch[1]);
@@ -1495,7 +1476,6 @@ async function sendChat() {
 }
 
 function buildSystemPrompt() {
-  const sample = data.slice(0, 20);
   return `You are SheetMind, an expert AI data analyst embedded in a spreadsheet application. You help users transform, clean, and analyze their tabular data.
 
 CURRENT SPREADSHEET:
