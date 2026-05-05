@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SheetMind — AI-Powered Spreadsheet</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090b;
+  --bg2:#111113;
+  --bg3:#18181b;
+  --bg4:#1f1f23;
+  --bg5:#27272c;
+  --border:#2a2a30;
+  --border2:#38383f;
+  --border3:#48484f;
+  --text:#f4f4f6;
+  --text2:#a0a0ab;
+  --text3:#606068;
+  --text4:#3a3a42;
+  --accent:#e8ff47;
+  --accent-dim:#c8df2a;
+  --accent-bg:rgba(232,255,71,0.06);
+  --accent-bg2:rgba(232,255,71,0.12);
+  --teal:#2dd4bf;
+  --teal-bg:rgba(45,212,191,0.08);
+  --red:#f87171;
+  --red-bg:rgba(248,113,113,0.08);
+  --orange:#fb923c;
+  --cell-h:30px;
+  --header-h:34px;
+  --sidebar-w:360px;
+  --topbar-h:54px;
+  --toolbar-h:40px;
+}
+
+/* ---- GLOBAL ---- */
+html,body{height:100%;overflow:hidden}
+body{font-family:'Geist',sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;display:flex;flex-direction:column}
+input,textarea,button,select{font-family:'Geist',sans-serif}
+::selection{background:rgba(232,255,71,0.2)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--border3)}
+
+/* ---- TOPBAR ---- */
+.topbar{
+  height:var(--topbar-h);
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  padding:0 16px;
+  gap:12px;
+  flex-shrink:0;
+  position:relative;
+  z-index:10;
+}
+.logo{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-right:4px;
+}
+.logo-mark{
+  width:28px;height:28px;
+  background:var(--accent);
+  border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.logo-mark svg{display:block}
+.logo-text{
+  font-family:'Instrument Serif',serif;
+  font-size:18px;
+  color:var(--text);
+  letter-spacing:-0.3px;
+}
+.logo-text em{font-style:italic;color:var(--text2)}
+
+.divider{width:1px;height:20px;background:var(--border);flex-shrink:0}
+
+.file-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 10px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:6px;
+  font-size:11px;
+  color:var(--text3);
+  font-family:'DM Mono',monospace;
+  max-width:200px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  flex-shrink:0;
+}
+.file-pill.loaded{color:var(--text2);border-color:var(--border2)}
+
+.tb-spacer{flex:1}
+
+.tb-btn{
+  height:30px;
+  padding:0 12px;
+  border-radius:6px;
+  border:1px solid var(--border2);
+  background:transparent;
+  color:var(--text2);
+  font-size:12px;
+  font-weight:500;
+  cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;
+  transition:all .15s;
+  white-space:nowrap;
+  flex-shrink:0;
+}
+.tb-btn:hover{background:var(--bg4);color:var(--text);border-color:var(--border3)}
+.tb-btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+.tb-btn.accent{background:var(--accent);border-color:var(--accent);color:#09090b;font-weight:600}
+.tb-btn.accent:hover{background:var(--accent-dim);border-color:var(--accent-dim)}
+.tb-btn svg{flex-shrink:0}
+
+.upload-btn-label{
+  height:30px;
+  padding:0 12px;
+  border-radius:6px;
+  border:1px solid var(--border2);
+  background:transparent;
+  color:var(--text2);
+  font-size:12px;
+  font-weight:500;
+  cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;
+  transition:all .15s;
+  white-space:nowrap;
+  flex-shrink:0;
+}
+.upload-btn-label:hover{background:var(--bg4);color:var(--text);border-color:var(--border3)}
+input[type=file]{display:none}
+
+/* ---- MAIN ---- */
+.main-layout{display:flex;flex:1;min-height:0;overflow:hidden}
+
+/* ---- SHEET PANE ---- */
+.sheet-pane{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  overflow:hidden;
+  background:var(--bg);
+}
+
+.sheet-toolbar{
+  height:var(--toolbar-h);
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+  padding:0 12px;
+  flex-shrink:0;
+}
+.cell-ref-box{
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  color:var(--text2);
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:5px;
+  padding:4px 8px;
+  width:64px;text-align:center;
+  flex-shrink:0;
+}
+.fx-label{font-size:11px;color:var(--text3);font-style:italic;flex-shrink:0;font-family:'Instrument Serif',serif}
+.formula-input{
+  flex:1;
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+  color:var(--text);
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:5px;
+  padding:4px 8px;
+  outline:none;
+  min-width:0;
+}
+.formula-input:focus{border-color:var(--accent);background:var(--bg4)}
+
+.sheet-toolbar .tb-btn{height:26px;font-size:11px;padding:0 8px}
+
+/* ---- TABLE AREA ---- */
+.table-container{flex:1;overflow:auto;position:relative}
+
+/* Empty state */
+.empty-drop{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;
+  padding:48px;
+}
+.drop-zone{
+  border:1.5px dashed var(--border2);
+  border-radius:16px;
+  padding:48px 64px;
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  cursor:pointer;
+  transition:all .2s;
+  text-align:center;
+  max-width:480px;
+}
+.drop-zone:hover,.drop-zone.drag-over{
+  border-color:var(--accent);
+  background:var(--accent-bg);
+}
+.drop-icon{
+  width:52px;height:52px;
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:4px;
+}
+.drop-title{font-size:18px;font-family:'Instrument Serif',serif;color:var(--text)}
+.drop-sub{font-size:13px;color:var(--text3);line-height:1.6}
+.drop-formats{display:flex;gap:6px;margin-top:4px}
+.fmt-badge{font-size:10px;font-family:'DM Mono',monospace;padding:3px 7px;border-radius:4px;background:var(--bg4);border:1px solid var(--border2);color:var(--text3)}
+
+/* Or divider */
+.or-row{display:flex;align-items:center;gap:12px;max-width:480px;width:100%}
+.or-line{flex:1;height:1px;background:var(--border)}
+.or-text{font-size:11px;color:var(--text4)}
+
+.scratch-btn{
+  padding:8px 20px;
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-radius:8px;
+  color:var(--text2);
+  font-size:13px;
+  cursor:pointer;
+  transition:all .15s;
+}
+.scratch-btn:hover{background:var(--bg4);color:var(--text);border-color:var(--border3)}
+
+/* DATA TABLE */
+.data-table{
+  border-collapse:collapse;
+  font-size:12px;
+  font-family:'DM Mono',monospace;
+  width:max-content;
+  min-width:100%;
+}
+.th-corner{
+  position:sticky;top:0;left:0;z-index:5;
+  background:var(--bg2);
+  border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border2);
+  width:46px;min-width:46px;
+}
+.th-col{
+  position:sticky;top:0;z-index:3;
+  background:var(--bg2);
+  border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border2);
+  height:var(--header-h);
+  padding:0 10px;
+  text-align:left;
+  font-size:11px;
+  font-weight:500;
+  color:var(--text3);
+  font-family:'Geist',sans-serif;
+  white-space:nowrap;
+  cursor:default;
+  min-width:110px;
+  max-width:240px;
+  user-select:none;
+  transition:background .1s,color .1s;
+}
+.th-col:hover{background:var(--bg3);color:var(--text2)}
+.th-col .col-name{overflow:hidden;text-overflow:ellipsis;display:block}
+.td-rownum{
+  position:sticky;left:0;z-index:2;
+  background:var(--bg2);
+  border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  width:46px;min-width:46px;
+  text-align:center;
+  font-size:10px;
+  color:var(--text4);
+  font-family:'DM Mono',monospace;
+  user-select:none;
+}
+.td-cell{
+  height:var(--cell-h);
+  border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  padding:0;
+  min-width:110px;
+  max-width:240px;
+  position:relative;
+}
+.td-cell.sel{
+  outline:1.5px solid var(--accent);
+  outline-offset:-1px;
+  z-index:1;
+}
+.td-cell.row-sel{background:rgba(255,255,255,0.018)}
+.td-cell.changed-flash{
+  background:rgba(45,212,191,0.12)!important;
+  animation:cellFlash .8s ease forwards;
+}
+@keyframes cellFlash{
+  0%{background:rgba(45,212,191,0.35)!important}
+  100%{background:rgba(45,212,191,0.04)!important}
+}
+.cell-inp{
+  display:block;
+  width:100%;height:100%;
+  padding:0 8px;
+  background:transparent;
+  border:none;outline:none;
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+  color:var(--text);
+  cursor:default;
+}
+.cell-inp:focus{cursor:text;background:var(--bg4)}
+.cell-inp::placeholder{color:var(--text4)}
+
+/* ---- STATUSBAR ---- */
+.statusbar{
+  height:26px;
+  background:var(--bg2);
+  border-top:1px solid var(--border);
+  display:flex;align-items:center;gap:20px;
+  padding:0 14px;
+  font-size:10px;
+  font-family:'DM Mono',monospace;
+  color:var(--text3);
+  flex-shrink:0;
+}
+.statusbar .st-item{display:flex;align-items:center;gap:5px}
+.status-dot{width:5px;height:5px;border-radius:50%;background:var(--text4)}
+.status-dot.ok{background:var(--teal)}
+.status-dot.warn{background:var(--orange)}
+.status-dot.err{background:var(--red)}
+.st-spacer{flex:1}
+
+/* ---- SIDEBAR ---- */
+.sidebar{
+  width:var(--sidebar-w);
+  min-width:var(--sidebar-w);
+  background:var(--bg2);
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.sidebar-header{
+  height:var(--topbar-h);
+  display:flex;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.s-tab{
+  flex:1;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;
+  font-weight:500;
+  color:var(--text3);
+  cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:all .15s;
+  gap:6px;
+  padding-top:2px;
+}
+.s-tab:hover{color:var(--text2)}
+.s-tab.active{color:var(--accent);border-color:var(--accent)}
+
+/* ---- API KEY SECTION ---- */
+.api-section{
+  padding:14px 16px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.api-label{
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.8px;
+  text-transform:uppercase;
+  color:var(--text3);
+  margin-bottom:8px;
+  display:flex;align-items:center;gap:6px;
+}
+.api-row{display:flex;gap:6px}
+.api-inp{
+  flex:1;
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+  padding:6px 10px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--text);
+  outline:none;
+  min-width:0;
+}
+.api-inp:focus{border-color:var(--accent)}
+.api-inp::placeholder{color:var(--text4)}
+.api-toggle{
+  padding:0 10px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--text3);
+  cursor:pointer;
+  font-size:11px;
+  transition:all .15s;
+  white-space:nowrap;
+}
+.api-toggle:hover{background:var(--bg4);color:var(--text)}
+.api-status-row{
+  display:flex;align-items:center;gap:6px;
+  margin-top:7px;
+  font-size:10px;
+}
+
+/* ---- CHAT ---- */
+.chat-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.messages-wrap{flex:1;overflow-y:auto;padding:14px 14px 4px;display:flex;flex-direction:column;gap:12px}
+
+.msg{display:flex;flex-direction:column;gap:3px}
+.msg.user{align-items:flex-end}
+.msg.ai{align-items:flex-start}
+.msg-meta{font-size:10px;color:var(--text4);padding:0 4px;font-family:'DM Mono',monospace}
+
+.bubble{
+  padding:10px 13px;
+  border-radius:10px;
+  font-size:12px;
+  line-height:1.7;
+  max-width:92%;
+  word-break:break-word;
+}
+.msg.user .bubble{
+  background:var(--accent-bg2);
+  border:1px solid rgba(232,255,71,0.2);
+  color:var(--text);
+  border-radius:10px 10px 2px 10px;
+}
+.msg.ai .bubble{
+  background:var(--bg3);
+  border:1px solid var(--border);
+  color:var(--text);
+  border-radius:10px 10px 10px 2px;
+}
+.bubble code{
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  background:var(--bg5);
+  padding:1px 5px;
+  border-radius:4px;
+  color:var(--teal);
+}
+.bubble strong{color:var(--text);font-weight:600}
+.bubble p+p{margin-top:6px}
+
+.change-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  background:var(--teal-bg);
+  border:1px solid rgba(45,212,191,0.2);
+  border-radius:5px;
+  padding:3px 8px;
+  font-size:10px;
+  font-family:'DM Mono',monospace;
+  color:var(--teal);
+  margin-top:6px;
+}
+
+/* thinking */
+.thinking-bubble{
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:10px 10px 10px 2px;
+  padding:10px 14px;
+  display:flex;align-items:center;gap:5px;
+}
+.th-dot{width:5px;height:5px;border-radius:50%;background:var(--text3);animation:th .9s infinite}
+.th-dot:nth-child(2){animation-delay:.18s}
+.th-dot:nth-child(3){animation-delay:.36s}
+@keyframes th{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+
+/* quick actions */
+.quick-wrap{
+  padding:10px 14px 0;
+  display:flex;flex-wrap:wrap;gap:5px;
+  flex-shrink:0;
+}
+.q-chip{
+  font-size:10px;
+  padding:4px 9px;
+  border-radius:20px;
+  border:1px solid var(--border2);
+  background:transparent;
+  color:var(--text3);
+  cursor:pointer;
+  transition:all .15s;
+  white-space:nowrap;
+}
+.q-chip:hover{border-color:rgba(232,255,71,0.4);color:var(--accent);background:var(--accent-bg)}
+
+/* chat input */
+.chat-input-bar{
+  padding:12px 14px;
+  border-top:1px solid var(--border);
+  flex-shrink:0;
+}
+.chat-input-wrap{
+  display:flex;gap:8px;align-items:flex-end;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:8px 8px 8px 12px;
+  transition:border-color .15s;
+}
+.chat-input-wrap:focus-within{border-color:var(--border3)}
+.chat-ta{
+  flex:1;
+  background:transparent;
+  border:none;outline:none;
+  font-size:12px;
+  color:var(--text);
+  resize:none;
+  min-height:18px;
+  max-height:96px;
+  line-height:1.5;
+}
+.chat-ta::placeholder{color:var(--text4)}
+.send-btn{
+  width:30px;height:30px;
+  border-radius:7px;
+  background:var(--accent);
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  transition:all .15s;
+}
+.send-btn:hover{background:var(--accent-dim)}
+.send-btn:disabled{opacity:.35;cursor:not-allowed}
+.send-btn svg{display:block}
+
+/* ---- HISTORY PANEL ---- */
+.history-panel{flex:1;overflow-y:auto;padding:12px;display:none;flex-direction:column;gap:8px}
+.hist-empty{text-align:center;padding:40px 20px;color:var(--text4);font-size:12px;line-height:1.8}
+.hist-item{
+  padding:10px 12px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:8px;
+  cursor:pointer;
+  transition:all .15s;
+}
+.hist-item:hover{border-color:var(--border2);background:var(--bg4)}
+.hist-item.current{border-color:rgba(232,255,71,0.3);background:var(--accent-bg)}
+.hist-label{font-size:12px;font-weight:500;color:var(--text);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-meta{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;display:flex;gap:10px}
+.hist-restore{
+  margin-top:6px;
+  font-size:10px;
+  color:var(--text3);
+  padding:3px 8px;
+  background:var(--bg4);
+  border:1px solid var(--border);
+  border-radius:4px;
+  cursor:pointer;
+  display:inline-block;
+  transition:all .15s;
+}
+.hist-restore:hover{color:var(--accent);border-color:rgba(232,255,71,0.3)}
+
+/* ---- TOAST ---- */
+.toast{
+  position:fixed;
+  bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(12px);
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  color:var(--text);
+  padding:8px 18px;
+  border-radius:8px;
+  font-size:12px;
+  opacity:0;
+  pointer-events:none;
+  transition:all .25s;
+  z-index:1000;
+  white-space:nowrap;
+  display:flex;align-items:center;gap:8px;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:rgba(45,212,191,0.4);color:var(--teal)}
+.toast.err{border-color:rgba(248,113,113,0.4);color:var(--red)}
+.toast.info{border-color:rgba(232,255,71,0.3);color:var(--accent)}
+
+/* ---- CONTEXT MENU ---- */
+.ctx-menu{
+  position:fixed;
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-radius:8px;
+  padding:4px;
+  z-index:500;
+  min-width:160px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  display:none;
+}
+.ctx-menu.show{display:block}
+.ctx-item{
+  padding:7px 12px;
+  border-radius:5px;
+  font-size:12px;
+  color:var(--text2);
+  cursor:pointer;
+  display:flex;align-items:center;gap:8px;
+  transition:all .1s;
+}
+.ctx-item:hover{background:var(--bg4);color:var(--text)}
+.ctx-item.danger{color:var(--red)}
+.ctx-item.danger:hover{background:var(--red-bg)}
+.ctx-sep{height:1px;background:var(--border);margin:4px 0}
+
+/* ---- DRAG OVER OVERLAY ---- */
+.drag-overlay{
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(9,9,11,0.85);
+  z-index:900;
+  flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:12px;
+  border:2px dashed var(--accent);
+  margin:16px;border-radius:12px;
+}
+.drag-overlay.show{display:flex}
+.drag-overlay-text{font-family:'Instrument Serif',serif;font-size:24px;color:var(--accent)}
+.drag-overlay-sub{font-size:13px;color:var(--text3)}
+
+/* ---- RESIZE HANDLE ---- */
+.resize-handle{
+  width:4px;
+  background:transparent;
+  cursor:col-resize;
+  flex-shrink:0;
+  transition:background .15s;
+}
+.resize-handle:hover{background:var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar" id="topbar">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="1" y="1" width="6" height="6" rx="1" fill="#09090b"/>
+        <rect x="9" y="1" width="6" height="6" rx="1" fill="#09090b" opacity=".7"/>
+        <rect x="1" y="9" width="6" height="6" rx="1" fill="#09090b" opacity=".7"/>
+        <rect x="9" y="9" width="6" height="6" rx="1" fill="#09090b" opacity=".5"/>
+      </svg>
+    </div>
+    <span class="logo-text">Sheet<em>Mind</em></span>
+  </div>
+  <div class="divider"></div>
+  <label class="upload-btn-label" for="fileInput" title="Upload CSV or XLSX">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+      <path d="M13.5 10v1.5A2 2 0 0111.5 13.5h-7A2 2 0 012.5 11.5V10M8 2.5V10M5 5l3-2.5L11 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Upload
+  </label>
+  <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
+  <div class="file-pill" id="filePill">No file loaded</div>
+  <div class="tb-spacer"></div>
+  <button class="tb-btn" onclick="addRow()" id="btnAddRow" disabled title="Add empty row">
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    Row
+  </button>
+  <button class="tb-btn" onclick="addCol()" id="btnAddCol" disabled title="Add column">
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    Column
+  </button>
+  <div class="divider"></div>
+  <button class="tb-btn" onclick="undoLast()" id="btnUndo" disabled title="Undo last AI change">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 7.5l3-4v2.5c4 0 6.5 2.5 7 6-1.5-2.5-3.5-3.5-7-3.5V11L3 7.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Undo
+  </button>
+  <button class="tb-btn accent" onclick="exportFile()" id="btnExport" disabled>
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+      <path d="M13.5 10v1.5A2 2 0 0111.5 13.5h-7A2 2 0 012.5 11.5V10M8 2.5V10M5 8l3 2.5L11 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Export CSV
+  </button>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main-layout" id="mainLayout">
+
+  <!-- SHEET PANE -->
+  <div class="sheet-pane" id="sheetPane">
+    <!-- toolbar -->
+    <div class="sheet-toolbar">
+      <div class="cell-ref-box" id="cellRefBox">A1</div>
+      <span class="fx-label">ƒx</span>
+      <input class="formula-input" id="formulaInput" placeholder="Select a cell to view or edit…" oninput="onFormulaChange(this.value)" onkeydown="onFormulaKey(event)">
+      <button class="tb-btn" style="color:var(--red);border-color:#3a1515" onclick="deleteSelectedRow()" id="btnDelRow" title="Delete selected row" style="display:none" disabled>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M5 3V2h2v1M10 3l-.5 7a1 1 0 01-1 1h-5a1 1 0 01-1-1L2 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Del Row
+      </button>
+    </div>
+
+    <!-- table container -->
+    <div class="table-container" id="tableContainer">
+      <!-- Empty state -->
+      <div class="empty-drop" id="emptyState">
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          <div class="drop-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke="var(--border2)" stroke-width="1.5"/>
+              <path d="M3 9h18M9 3v18" stroke="var(--border2)" stroke-width="1.5"/>
+              <path d="M13 13l-1 1-1-1" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="drop-title">Drop your spreadsheet here</div>
+          <div class="drop-sub">Drag &amp; drop a file or click to browse. Your data stays private — processed entirely in your browser.</div>
+          <div class="drop-formats">
+            <span class="fmt-badge">CSV</span>
+            <span class="fmt-badge">XLSX</span>
+            <span class="fmt-badge">XLS</span>
+          </div>
+        </div>
+        <div class="or-row"><div class="or-line"></div><span class="or-text">or</span><div class="or-line"></div></div>
+        <button class="scratch-btn" onclick="createFromScratch()">Start from scratch with AI →</button>
+      </div>
+      <!-- Table will be injected here -->
+      <table class="data-table" id="dataTable" style="display:none"></table>
+    </div>
+
+    <!-- status bar -->
+    <div class="statusbar" id="statusbar" style="display:none">
+      <div class="st-item"><div class="status-dot" id="sdot"></div><span id="stext">Ready</span></div>
+      <div class="st-item" id="sDim"></div>
+      <div class="st-item" id="sSel"></div>
+      <div class="st-spacer"></div>
+      <div class="st-item" id="sChanges"></div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <!-- tabs -->
+    <div class="sidebar-header">
+      <div class="s-tab active" id="tabChat" onclick="switchTab('chat')">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M14 10.5A1.5 1.5 0 0112.5 12H5l-3 2.5V3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5v7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        AI Chat
+      </div>
+      <div class="s-tab" id="tabHistory" onclick="switchTab('history')">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.5l2 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        History
+      </div>
+    </div>
+
+    <!-- API KEY -->
+    <div class="api-section">
+      <div class="api-label">
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M7 7l3 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Anthropic API Key
+      </div>
+      <div class="api-row">
+        <input class="api-inp" type="password" id="apiKeyInp" placeholder="sk-ant-api03-…" oninput="handleApiKey(this.value)" autocomplete="off">
+        <button class="api-toggle" onclick="toggleApiVis()" id="apiVisBtn">Show</button>
+      </div>
+      <div class="api-status-row">
+        <div class="status-dot" id="apiDot"></div>
+        <span id="apiMsg" style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace"></span>
+      </div>
+    </div>
+
+    <!-- CHAT PANEL -->
+    <div class="chat-panel" id="chatPanel">
+      <div class="messages-wrap" id="messagesWrap">
+        <!-- welcome -->
+        <div class="msg ai" id="welcomeMsg">
+          <div class="bubble">
+            <strong>Welcome to SheetMind!</strong><br><br>
+            I can help you transform, analyze, and clean your spreadsheet data using natural language.<br><br>
+            Try things like:<br>
+            • <code>Clean and standardize all text</code><br>
+            • <code>Add a "Total" column multiplying cols B × C</code><br>
+            • <code>Sort by revenue descending</code><br>
+            • <code>Remove rows where status is empty</code><br>
+            • <code>Create a summary row at the bottom</code>
+          </div>
+          <div class="msg-meta">SheetMind · ready</div>
+        </div>
+      </div>
+
+      <div class="quick-wrap" id="quickWrap">
+        <button class="q-chip" onclick="quickSend('Clean and standardize all the data')">🧹 Clean data</button>
+        <button class="q-chip" onclick="quickSend('Add row numbers as first column')">🔢 Row numbers</button>
+        <button class="q-chip" onclick="quickSend('Sort by the first numeric column, descending')">↕ Sort</button>
+        <button class="q-chip" onclick="quickSend('Remove duplicate rows')">✦ Dedup</button>
+        <button class="q-chip" onclick="quickSend('Fill all empty cells with N/A')">⬜ Fill blanks</button>
+        <button class="q-chip" onclick="quickSend('Summarize this dataset for me')">📊 Summarize</button>
+        <button class="q-chip" onclick="quickSend('Capitalize all text values properly')">Aa Format text</button>
+        <button class="q-chip" onclick="quickSend('Add a calculated Total column')">+ Add column</button>
+      </div>
+
+      <div class="chat-input-bar">
+        <div class="chat-input-wrap">
+          <textarea class="chat-ta" id="chatTa" placeholder="Ask AI to transform your data…" rows="1" onkeydown="onChatKey(event)" oninput="resizeTa(this)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendChat()">
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M12.5 7L1.5 1.5l2 5.5-2 5.5 11-5.5z" fill="#09090b"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY PANEL -->
+    <div class="history-panel" id="historyPanel">
+      <div class="hist-empty" id="histEmpty">No versions yet.<br>Every AI transformation is saved here so you can restore previous states.</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" onclick="ctxInsertRowAbove()">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3.5h10M6 1v5M4 8.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Insert row above
+  </div>
+  <div class="ctx-item" onclick="ctxInsertRowBelow()">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 8.5h10M6 6v5M4 3.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    Insert row below
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxCopyRow()">Copy row</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" onclick="ctxDeleteRow()">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M5 3V2h2v1M10 3l-.5 7a1 1 0 01-1 1h-5a1 1 0 01-1-1L2 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Delete row
+  </div>
+</div>
+
+<!-- DRAG OVERLAY -->
+<div class="drag-overlay" id="dragOverlay">
+  <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="8" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4"/><path d="M24 16v16M16 24l8-8 8 8" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div class="drag-overlay-text">Drop to load spreadsheet</div>
+  <div class="drag-overlay-sub">CSV, XLSX, or XLS</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════ */
+let headers = [];
+let data = [];
+let selectedCell = { r: 0, c: 0 };
+let apiKey = localStorage.getItem('sm_key') || '';
+let versions = [];
+let isAiLoading = false;
+let currentFilename = '';
+let activeTab = 'chat';
+let ctxRow = -1;
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+(function init() {
+  if (apiKey) document.getElementById('apiKeyInp').value = apiKey;
+  refreshApiStatus();
+  setupDragDrop();
+  document.addEventListener('click', () => hideCtx());
+  document.addEventListener('keydown', onGlobalKey);
+})();
+
+/* ═══════════════════════════════════════════════
+   API KEY
+═══════════════════════════════════════════════ */
+function handleApiKey(v) {
+  apiKey = v.trim();
+  localStorage.setItem('sm_key', apiKey);
+  refreshApiStatus();
+}
+function refreshApiStatus() {
+  const dot = document.getElementById('apiDot');
+  const msg = document.getElementById('apiMsg');
+  if (!apiKey) {
+    dot.className = 'status-dot'; msg.textContent = 'Enter your key to enable AI'; return;
+  }
+  if (apiKey.startsWith('sk-ant-')) {
+    dot.className = 'status-dot ok'; msg.textContent = 'Key set · Claude Sonnet 4';
+  } else {
+    dot.className = 'status-dot err'; msg.textContent = 'Looks invalid — expected sk-ant-…';
+  }
+}
+function toggleApiVis() {
+  const i = document.getElementById('apiKeyInp');
+  const b = document.getElementById('apiVisBtn');
+  i.type = i.type === 'password' ? 'text' : 'password';
+  b.textContent = i.type === 'password' ? 'Show' : 'Hide';
+}
+
+/* ═══════════════════════════════════════════════
+   FILE UPLOAD
+═══════════════════════════════════════════════ */
+document.getElementById('fileInput').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) loadFile(f);
+  e.target.value = '';
+});
+
+function loadFile(f) {
+  currentFilename = f.name;
+  document.getElementById('filePill').textContent = f.name;
+  document.getElementById('filePill').classList.add('loaded');
+  const reader = new FileReader();
+  if (f.name.match(/\.csv$/i)) {
+    reader.onload = ev => parseCSV(ev.target.result);
+    reader.readAsText(f);
+  } else {
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (!arr.length) { toast('File appears empty', 'err'); return; }
+        headers = arr[0].map(String);
+        data = arr.slice(1).map(r => {
+          const row = r.map(String);
+          while (row.length < headers.length) row.push('');
+          return row.slice(0, headers.length);
+        });
+        renderSheet();
+        activateSheet();
+        toast(`Loaded ${data.length} rows × ${headers.length} cols`, 'ok');
+      } catch (e) { toast('Could not parse file: ' + e.message, 'err'); }
+    };
+    reader.readAsArrayBuffer(f);
+  }
+}
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) { toast('Empty CSV', 'err'); return; }
+  const parseRow = l => {
+    const r = []; let cur = '', inQ = false;
+    for (let i = 0; i < l.length; i++) {
+      const c = l[i];
+      if (c === '"' && !inQ) inQ = true;
+      else if (c === '"' && inQ && l[i+1] === '"') { cur += '"'; i++; }
+      else if (c === '"' && inQ) inQ = false;
+      else if (c === ',' && !inQ) { r.push(cur); cur = ''; }
+      else cur += c;
+    }
+    r.push(cur);
+    return r;
+  };
+  const all = lines.map(parseRow);
+  const maxLen = Math.max(...all.map(r => r.length));
+  headers = all[0].map((h, i) => h || `Column${i+1}`);
+  data = all.slice(1).map(r => {
+    while (r.length < maxLen) r.push('');
+    return r.slice(0, headers.length);
+  });
+  renderSheet();
+  activateSheet();
+  toast(`Loaded ${data.length} rows × ${headers.length} cols`, 'ok');
+}
+
+function createFromScratch() {
+  headers = ['Name', 'Value', 'Category', 'Notes'];
+  data = [['Item 1', '100', 'A', ''], ['Item 2', '200', 'B', ''], ['Item 3', '150', 'A', '']];
+  currentFilename = 'new_spreadsheet.csv';
+  document.getElementById('filePill').textContent = 'new_spreadsheet.csv';
+  document.getElementById('filePill').classList.add('loaded');
+  renderSheet();
+  activateSheet();
+  appendMsg('ai', 'I\'ve created a blank spreadsheet with sample data. You can edit cells directly, add rows/columns, or ask me to populate it with specific data.');
+}
+
+/* ═══════════════════════════════════════════════
+   SHEET ACTIVATE / DEACTIVATE
+═══════════════════════════════════════════════ */
+function activateSheet() {
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('dataTable').style.display = '';
+  document.getElementById('statusbar').style.display = '';
+  ['btnAddRow','btnAddCol','btnExport','btnDelRow'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
+  selectedCell = { r: 0, c: 0 };
+  updateFormulaBar();
+}
+
+/* ═══════════════════════════════════════════════
+   RENDER TABLE
+═══════════════════════════════════════════════ */
+function renderSheet(flashCells = []) {
+  const flashSet = new Set(flashCells.map(([r,c]) => `${r},${c}`));
+  const table = document.getElementById('dataTable');
+
+  let html = '<colgroup><col style="width:46px">';
+  headers.forEach(() => html += '<col>');
+  html += '</colgroup>';
+
+  // Header row
+  html += '<thead><tr><th class="th-corner"></th>';
+  headers.forEach((h, i) => {
+    html += `<th class="th-col" ondblclick="renameHeader(${i})" title="Double-click to rename">`
+          + `<span class="col-name">${esc(h)}</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  data.forEach((row, r) => {
+    const isSel = selectedCell.r === r;
+    html += `<tr>`;
+    html += `<td class="td-rownum" oncontextmenu="showCtx(event,${r})">${r+1}</td>`;
+    headers.forEach((h, c) => {
+      const key = `${r},${c}`;
+      const sel = (selectedCell.r === r && selectedCell.c === c) ? ' sel' : '';
+      const rowCls = isSel ? ' row-sel' : '';
+      const flash = flashSet.has(key) ? ' changed-flash' : '';
+      const val = row[c] !== undefined ? row[c] : '';
+      html += `<td class="td-cell${sel}${rowCls}${flash}" `
+            + `onclick="selectCell(${r},${c})" `
+            + `ondblclick="focusCell(${r},${c})" `
+            + `oncontextmenu="showCtx(event,${r})">`
+            + `<input class="cell-inp" value="${escAttr(val)}" readonly `
+            + `data-r="${r}" data-c="${c}" `
+            + `onchange="onCellChange(this,${r},${c})" `
+            + `onkeydown="onCellKey(event,${r},${c})"`
+            + `></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+  updateStatus();
+  updateFormulaBar();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ═══════════════════════════════════════════════
+   CELL INTERACTION
+═══════════════════════════════════════════════ */
+function selectCell(r, c) {
+  selectedCell = { r, c };
+  updateFormulaBar();
+  document.getElementById('cellRefBox').textContent = colLetter(c) + (r + 1);
+  renderSheet();
+}
+function focusCell(r, c) {
+  selectCell(r, c);
+  const inp = document.querySelector(`input.cell-inp[data-r="${r}"][data-c="${c}"]`);
+  if (inp) { inp.readOnly = false; inp.focus(); inp.select(); }
+}
+function onCellKey(e, r, c) {
+  if (e.key === 'Escape') { e.target.readOnly = true; e.target.value = data[r][c] || ''; e.target.blur(); return; }
+  if (e.key === 'Enter') { e.target.readOnly = true; e.target.blur(); if (r + 1 < data.length) selectCell(r + 1, c); return; }
+  if (e.key === 'Tab') { e.preventDefault(); e.target.readOnly = true; e.target.blur(); if (c + 1 < headers.length) selectCell(r, c + 1); else if (r + 1 < data.length) selectCell(r + 1, 0); return; }
+  if (e.key === 'F2' || (e.key.length === 1 && !e.ctrlKey && !e.metaKey)) { e.target.readOnly = false; }
+}
+function onCellChange(inp, r, c) {
+  data[r][c] = inp.value;
+  inp.readOnly = true;
+  updateStatus();
+  if (r === selectedCell.r && c === selectedCell.c) updateFormulaBar();
+}
+function onFormulaChange(v) {
+  if (data[selectedCell.r]) {
+    data[selectedCell.r][selectedCell.c] = v;
+    const inp = document.querySelector(`input.cell-inp[data-r="${selectedCell.r}"][data-c="${selectedCell.c}"]`);
+    if (inp) inp.value = v;
+  }
+}
+function onFormulaKey(e) {
+  if (e.key === 'Enter') {
+    const { r, c } = selectedCell;
+    if (r + 1 < data.length) selectCell(r + 1, c);
+  }
+}
+function updateFormulaBar() {
+  const { r, c } = selectedCell;
+  const val = (data[r] && data[r][c] !== undefined) ? data[r][c] : '';
+  document.getElementById('formulaInput').value = val;
+  document.getElementById('cellRefBox').textContent = colLetter(c) + (r + 1);
+}
+
+function onGlobalKey(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const { r, c } = selectedCell;
+  if (e.key === 'ArrowDown' && r + 1 < data.length) { e.preventDefault(); selectCell(r + 1, c); }
+  if (e.key === 'ArrowUp' && r > 0) { e.preventDefault(); selectCell(r - 1, c); }
+  if (e.key === 'ArrowRight' && c + 1 < headers.length) { e.preventDefault(); selectCell(r, c + 1); }
+  if (e.key === 'ArrowLeft' && c > 0) { e.preventDefault(); selectCell(r, c - 1); }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (data[r]) { data[r][c] = ''; renderSheet(); }
+  }
+}
+
+function colLetter(n) {
+  let s = ''; n++;
+  while (n > 0) { s = String.fromCharCode(64 + (n % 26 || 26)) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+/* ═══════════════════════════════════════════════
+   HEADER RENAME
+═══════════════════════════════════════════════ */
+function renameHeader(i) {
+  const v = prompt('Rename column:', headers[i]);
+  if (v !== null && v.trim()) { headers[i] = v.trim(); renderSheet(); }
+}
+
+/* ═══════════════════════════════════════════════
+   ROW / COL OPERATIONS
+═══════════════════════════════════════════════ */
+function addRow() {
+  saveVersion('Add empty row');
+  data.push(new Array(headers.length).fill(''));
+  renderSheet();
+  toast('Row added', 'ok');
+}
+function addCol() {
+  const name = prompt('Column name:', 'Column ' + (headers.length + 1));
+  if (!name) return;
+  saveVersion('Add column: ' + name);
+  headers.push(name.trim());
+  data.forEach(r => r.push(''));
+  renderSheet();
+  toast('Column added', 'ok');
+}
+function deleteSelectedRow() {
+  const r = selectedCell.r;
+  if (r < 0 || r >= data.length) return;
+  if (!confirm(`Delete row ${r + 1}?`)) return;
+  saveVersion('Delete row ' + (r + 1));
+  data.splice(r, 1);
+  selectedCell.r = Math.min(r, data.length - 1);
+  renderSheet();
+  toast('Row deleted', 'ok');
+}
+
+/* ═══════════════════════════════════════════════
+   CONTEXT MENU
+═══════════════════════════════════════════════ */
+function showCtx(e, r) {
+  e.preventDefault(); e.stopPropagation();
+  ctxRow = r;
+  selectCell(r, selectedCell.c);
+  const m = document.getElementById('ctxMenu');
+  m.style.left = e.clientX + 'px';
+  m.style.top = e.clientY + 'px';
+  m.classList.add('show');
+}
+function hideCtx() { document.getElementById('ctxMenu').classList.remove('show'); }
+function ctxInsertRowAbove() { hideCtx(); saveVersion('Insert row above ' + (ctxRow + 1)); data.splice(ctxRow, 0, new Array(headers.length).fill('')); renderSheet(); }
+function ctxInsertRowBelow() { hideCtx(); saveVersion('Insert row below ' + (ctxRow + 1)); data.splice(ctxRow + 1, 0, new Array(headers.length).fill('')); renderSheet(); }
+function ctxDeleteRow() { hideCtx(); saveVersion('Delete row ' + (ctxRow + 1)); data.splice(ctxRow, 1); selectedCell.r = Math.min(ctxRow, data.length - 1); renderSheet(); }
+function ctxCopyRow() {
+  hideCtx();
+  const row = data[ctxRow];
+  if (row) navigator.clipboard.writeText(row.join('\t')).then(() => toast('Row copied to clipboard', 'ok'));
+}
+
+/* ═══════════════════════════════════════════════
+   STATUS BAR
+═══════════════════════════════════════════════ */
+function updateStatus() {
+  document.getElementById('sDim').textContent = `${data.length} rows × ${headers.length} cols`;
+  document.getElementById('sSel').textContent = `${colLetter(selectedCell.c)}${selectedCell.r + 1}`;
+}
+
+/* ═══════════════════════════════════════════════
+   VERSION HISTORY
+═══════════════════════════════════════════════ */
+function saveVersion(label) {
+  versions.unshift({
+    label,
+    time: new Date().toLocaleTimeString(),
+    headers: JSON.parse(JSON.stringify(headers)),
+    data: JSON.parse(JSON.stringify(data))
+  });
+  if (versions.length > 50) versions.pop();
+  document.getElementById('btnUndo').disabled = false;
+  renderVersionHistory();
+}
+function undoLast() {
+  if (!versions.length) return;
+  const v = versions.shift();
+  headers = v.headers;
+  data = v.data;
+  renderSheet();
+  renderVersionHistory();
+  if (!versions.length) document.getElementById('btnUndo').disabled = true;
+  toast('Reverted: ' + v.label, 'info');
+}
+function restoreVersion(idx) {
+  if (!confirm('Restore this version? Current state will be lost.')) return;
+  const v = versions[idx];
+  headers = JSON.parse(JSON.stringify(v.headers));
+  data = JSON.parse(JSON.stringify(v.data));
+  renderSheet();
+  toast('Restored: ' + v.label, 'ok');
+}
+function renderVersionHistory() {
+  const panel = document.getElementById('historyPanel');
+  const empty = document.getElementById('histEmpty');
+  if (!versions.length) { empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  // clear old items
+  panel.querySelectorAll('.hist-item').forEach(el => el.remove());
+  versions.forEach((v, i) => {
+    const div = document.createElement('div');
+    div.className = 'hist-item' + (i === 0 ? ' current' : '');
+    div.innerHTML = `<div class="hist-label">${esc(v.label)}</div>`
+      + `<div class="hist-meta"><span>${v.time}</span><span>${v.data.length}r × ${v.headers.length}c</span></div>`
+      + (i > 0 ? `<span class="hist-restore" onclick="restoreVersion(${i})">Restore →</span>` : '<span style="font-size:10px;color:var(--teal);font-family:\'DM Mono\',monospace">◆ current</span>');
+    panel.appendChild(div);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════════════ */
+function exportFile() {
+  const rows = [headers, ...data];
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (currentFilename || 'sheetmind').replace(/\.(csv|xlsx|xls)$/i, '') + '_export.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('CSV exported', 'ok');
+}
+
+/* ═══════════════════════════════════════════════
+   DRAG & DROP
+═══════════════════════════════════════════════ */
+function setupDragDrop() {
+  const body = document.body;
+  const overlay = document.getElementById('dragOverlay');
+  let dragCnt = 0;
+  body.addEventListener('dragenter', e => { e.preventDefault(); dragCnt++; overlay.classList.add('show'); });
+  body.addEventListener('dragleave', () => { dragCnt--; if (dragCnt <= 0) { dragCnt = 0; overlay.classList.remove('show'); } });
+  body.addEventListener('dragover', e => e.preventDefault());
+  body.addEventListener('drop', e => {
+    e.preventDefault(); dragCnt = 0; overlay.classList.remove('show');
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+}
+
+/* ═══════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════ */
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tabChat').classList.toggle('active', tab === 'chat');
+  document.getElementById('tabHistory').classList.toggle('active', tab === 'history');
+  document.getElementById('chatPanel').style.display = tab === 'chat' ? 'flex' : 'none';
+  const hp = document.getElementById('historyPanel');
+  hp.style.display = tab === 'history' ? 'flex' : 'none';
+  if (tab === 'history') renderVersionHistory();
+}
+
+/* ═══════════════════════════════════════════════
+   CHAT
+═══════════════════════════════════════════════ */
+function quickSend(text) {
+  document.getElementById('chatTa').value = text;
+  sendChat();
+}
+function onChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+function resizeTa(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 96) + 'px';
+}
+
+function appendMsg(role, html, badge = '') {
+  const wrap = document.getElementById('messagesWrap');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  const formatted = html
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+  bubble.innerHTML = '<p>' + formatted + '</p>';
+  if (badge) {
+    const b = document.createElement('div');
+    b.className = 'change-badge';
+    b.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M3 5l1.5 1.5L7 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${badge}`;
+    bubble.appendChild(b);
+  }
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+  meta.textContent = role === 'user' ? 'You' : 'SheetMind · ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  div.appendChild(bubble);
+  div.appendChild(meta);
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+let thinkingEl = null;
+function showThinking() {
+  const wrap = document.getElementById('messagesWrap');
+  const div = document.createElement('div');
+  div.className = 'msg ai';
+  div.id = 'thinkingMsg';
+  div.innerHTML = '<div class="thinking-bubble"><div class="th-dot"></div><div class="th-dot"></div><div class="th-dot"></div></div>';
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  thinkingEl = div;
+}
+function hideThinking() {
+  if (thinkingEl) { thinkingEl.remove(); thinkingEl = null; }
+  const el = document.getElementById('thinkingMsg');
+  if (el) el.remove();
+}
+
+async function sendChat() {
+  const ta = document.getElementById('chatTa');
+  const text = ta.value.trim();
+  if (!text || isAiLoading) return;
+  if (!apiKey) { toast('Enter your API key first', 'err'); return; }
+
+  ta.value = ''; ta.style.height = 'auto';
+  appendMsg('user', text);
+  isAiLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+  showThinking();
+  setStatus('AI thinking…', 'warn');
+
+  const systemPrompt = buildSystemPrompt();
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8192,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: text }]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${resp.status}`);
+    }
+
+    const result = await resp.json();
+    const fullText = result.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    hideThinking();
+
+    // Try to extract JSON transformation block
+    const jsonMatch = fullText.match(/```json\s*([\s\S]*?)\s*```/);
+    let displayText = fullText.replace(/```json[\s\S]*?```/g, '').trim();
+    let badgeText = '';
+
+    if (jsonMatch) {
+      try {
+        const op = JSON.parse(jsonMatch[1]);
+        if (op.action === 'update' && op.headers && op.data) {
+          saveVersion(text.slice(0, 60) + (text.length > 60 ? '…' : ''));
+          const oldRows = data.length, oldCols = headers.length;
+          headers = op.headers.map(String);
+          data = op.data.map(r => r.map(c => String(c !== null && c !== undefined ? c : '')));
+          const flash = op.changedCells || [];
+          renderSheet(flash);
+          const newRows = data.length, newCols = headers.length;
+          badgeText = `Applied · ${newRows}r × ${newCols}c`;
+          if (!displayText) displayText = op.summary || 'Done! Data updated.';
+          toast('Changes applied · ' + (op.summary || '').slice(0, 50), 'ok');
+          document.getElementById('btnUndo').disabled = false;
+        }
+      } catch (e) {
+        console.warn('JSON parse failed:', e);
+      }
+    }
+
+    if (!displayText) displayText = 'Done! Let me know if you\'d like any further changes.';
+    appendMsg('ai', displayText, badgeText);
+    setStatus('Ready', 'ok');
+
+  } catch (e) {
+    hideThinking();
+    appendMsg('ai', `Sorry, I ran into an error: **${e.message}**\n\nDouble-check your API key and try again.`);
+    setStatus('Error', 'err');
+    toast('API error: ' + e.message.slice(0, 60), 'err');
+  }
+
+  isAiLoading = false;
+  document.getElementById('sendBtn').disabled = false;
+}
+
+function buildSystemPrompt() {
+  const sample = data.slice(0, 20);
+  return `You are SheetMind, an expert AI data analyst embedded in a spreadsheet application. You help users transform, clean, and analyze their tabular data.
+
+CURRENT SPREADSHEET:
+- Filename: ${currentFilename || 'untitled'}
+- Headers: ${JSON.stringify(headers)}
+- Total rows: ${data.length}
+- Columns: ${headers.length}
+- Full data (all rows): ${JSON.stringify(data)}
+
+YOUR RESPONSE FORMAT:
+1. Briefly explain what you're doing or what you found (1-3 sentences, conversational)
+2. If a transformation is needed, provide EXACTLY this JSON block at the END of your response:
+
+\`\`\`json
+{
+  "action": "update",
+  "headers": [/* full headers array, all strings */],
+  "data": [/* full 2D array of rows, all values as strings */],
+  "changedCells": [[rowIndex, colIndex], /* 0-indexed cells that changed */],
+  "summary": "Short description of changes (e.g. '47 cells updated, 3 rows removed')"
+}
+\`\`\`
+
+RULES:
+- ALL values in data must be strings (never null, undefined, or numbers)
+- changedCells should list significant changed cells (max 200 entries)
+- Return the COMPLETE dataset including unchanged rows
+- For sorting: return all rows reordered
+- For filtering: return only matching rows
+- For adding columns: add to headers and add a value to every row
+- For calculations: compute accurately
+- Never truncate the data array
+- If no data change is needed (e.g. just answering a question), omit the JSON block entirely
+
+Be helpful, precise, and proactive about data quality issues you notice.`;
+}
+
+function setStatus(text, type) {
+  document.getElementById('stext').textContent = text;
+  document.getElementById('sdot').className = 'status-dot' + (type ? ' ' + type : '');
+}
+
+/* ═══════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════ */
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast' + (type ? ' ' + type : '') + ' on';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 3200);
+}
+</script>
+</body>
+</html>
