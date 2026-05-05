@@ -1423,8 +1423,7 @@ async function sendChat() {
     hideThinking();
 
     // The rest of your JSON extraction logic remains the same
-    const jsonMatch = fullText.match(/```json\s*([\s\S]*?)\s*
-```/);
+    const jsonMatch = fullText.match(/```json\s*([\s\S]*?)\s*```/);
     let displayText = fullText.replace(/```json[\s\S]*?```/g, '').trim();
     let badgeText = '';
 
