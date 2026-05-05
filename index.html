@@ -929,32 +929,51 @@ function loadFile(f) {
   currentFilename = f.name;
   document.getElementById('filePill').textContent = f.name;
   document.getElementById('filePill').classList.add('loaded');
+  
   const reader = new FileReader();
+  
+  // Handle CSV separately
   if (f.name.match(/\.csv$/i)) {
     reader.onload = ev => parseCSV(ev.target.result);
     reader.readAsText(f);
-  } else {
+  } 
+  // Handle Excel (.xlsx, .xls)
+  else {
     reader.onload = ev => {
       try {
-        const wb = XLSX.read(ev.target.result, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
+        const dataArray = new Uint8Array(ev.target.result);
+        const wb = XLSX.read(dataArray, { type: 'array' });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        
+        // Convert to 2D array (header: 1 forces this)
         const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        if (!arr.length) { toast('File appears empty', 'err'); return; }
-        headers = arr[0].map(String);
+        
+        if (!arr || arr.length === 0) {
+          toast('File appears empty', 'err');
+          return;
+        }
+
+        // Clean headers and data
+        headers = arr[0].map(h => String(h || '').trim());
         data = arr.slice(1).map(r => {
-          const row = r.map(String);
+          const row = r.map(cell => String(cell ?? ''));
+          // Ensure every row has the same number of columns as headers
           while (row.length < headers.length) row.push('');
           return row.slice(0, headers.length);
         });
+
         renderSheet();
         activateSheet();
         toast(`Loaded ${data.length} rows × ${headers.length} cols`, 'ok');
-      } catch (e) { toast('Could not parse file: ' + e.message, 'err'); }
+      } catch (e) {
+        console.error(e);
+        toast('Could not parse Excel file', 'err');
+      }
     };
     reader.readAsArrayBuffer(f);
   }
 }
-
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (!lines.length) { toast('Empty CSV', 'err'); return; }
