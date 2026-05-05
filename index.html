@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SheetMind — AI-Powered Spreadsheet</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -941,7 +941,18 @@ function loadFile(f) {
   else {
     reader.onload = ev => {
       try {
+        // Ensure XLSX loaded correctly
+        if (typeof XLSX === 'undefined') {
+          throw new Error("Excel library failed to load. Check your internet connection.");
+        }
+
         const dataArray = new Uint8Array(ev.target.result);
+        
+        // Check if file is empty or locked by the OS
+        if (dataArray.length === 0) {
+            throw new Error("File is empty or locked by another program. Close Excel and try again.");
+        }
+
         const wb = XLSX.read(dataArray, { type: 'array' });
         const wsName = wb.SheetNames[0];
         const ws = wb.Sheets[wsName];
@@ -950,15 +961,17 @@ function loadFile(f) {
         const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         
         if (!arr || arr.length === 0) {
-          toast('File appears empty', 'err');
-          return;
+          throw new Error("No data found in the spreadsheet.");
         }
 
         // Clean headers and data
         headers = arr[0].map(h => String(h || '').trim());
+        
         data = arr.slice(1).map(r => {
-          const row = r.map(cell => String(cell ?? ''));
-          // Ensure every row has the same number of columns as headers
+          // Replaced '??' with safer null check for browser compatibility
+          const row = r.map(cell => String(cell !== undefined && cell !== null ? cell : ''));
+          
+          // Ensure every row has the exact same number of columns as headers
           while (row.length < headers.length) row.push('');
           return row.slice(0, headers.length);
         });
@@ -967,8 +980,8 @@ function loadFile(f) {
         activateSheet();
         toast(`Loaded ${data.length} rows × ${headers.length} cols`, 'ok');
       } catch (e) {
-        console.error(e);
-        toast('Could not parse Excel file', 'err');
+        console.error("Excel Parsing Error:", e);
+        toast('Error: ' + e.message, 'err');
       }
     };
     reader.readAsArrayBuffer(f);
